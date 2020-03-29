@@ -11,7 +11,7 @@ import cufflinks as cf
 from sklearn.linear_model import LinearRegression
 import numpy as np
 
-@st.cache()
+@st.cache(allow_output_mutation=True)
 def get_data_link(link):
     data = pd.read_csv(link)
     return data
