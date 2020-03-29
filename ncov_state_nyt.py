@@ -15,6 +15,26 @@ import numpy as np
 def get_data_link(link):
     data = pd.read_csv(link)
     return data
+
+@st.cache()
+def calc_scatter(select,confirmed):
+    full_scat=pd.DataFrame()
+    reg_val  =pd.DataFrame()
+    for i in select:
+       scat=pd.concat([confirmed[i],confirmed[i].diff()],axis=1)
+       scat.columns = ['Level','Change']
+       scat.fillna(0,inplace=True)
+       scat = scat[~(scat == 0).any(axis=1)]
+       # Log Log regression
+       X = np.log10(scat['Level']).values
+       Y = np.log10(scat['Change']).values
+       reg =LinearRegression().fit(X.reshape(-1,1),Y)
+       reg_val.loc[i,'Coef'] = reg.coef_[0]
+       scat['Country']=i
+       full_scat =pd.concat([full_scat,scat])
+       
+    return reg_val,full_scat
+    
 '''
 # 2019-nCoV tracker by county in the US
 
@@ -33,10 +53,11 @@ st.markdown('## Counties with most cases')
 st.write(last_value.head(n=20))
 
 
-select = st.sidebar.multiselect('Select counties', confirmed.columns.values)
+select = st.multiselect('Select counties', confirmed.columns.values)
 
 st.markdown('## Time series of total cases in county' )
-ax = confirmed[select].iplot(asFigure=True,logy=True)
+log_y = st.checkbox('Log scale ?')
+ax = confirmed[select].iplot(asFigure=True,logy=log_y)
 st.plotly_chart(ax)
 
 st.markdown('## Daily New cases')
@@ -44,26 +65,9 @@ ax1= confirmed[select].diff().iplot(asFigure=True)
 st.plotly_chart(ax1)
 
 st.markdown('## County growth rates vs total cases')
-# #country_sel = st.selectbox('Select country',confirmed.columns.values)
-
-full_scat=pd.DataFrame()
-reg_val  =pd.DataFrame()
-for i in select:
-    scat=pd.concat([confirmed[i],confirmed[i].diff()],axis=1)
-    scat.columns = ['Level','Change']
-    scat.fillna(0,inplace=True)
-    scat = scat[~(scat == 0).any(axis=1)]
-    # Log Log regression
-    X = np.log10(scat['Level']).values
-    Y = np.log10(scat['Change']).values
-    reg =LinearRegression().fit(X.reshape(-1,1),Y)
-    reg_val.loc[i,'Coef'] = reg.coef_[0]
-    
-    scat['Country']=i
-    full_scat =pd.concat([full_scat,scat])
 
 
-#st.write(scat)
+reg_val, full_scat = calc_scatter(select,confirmed[select])
 ax2 =full_scat.iplot(asFigure=True,x='Level',y='Change',mode='markers',logx=True,logy=True,categories='Country',xTitle='Total Cases',
                       yTitle='New Cases')
 st.plotly_chart(ax2)
